@@ -143,6 +143,5 @@ app.put('/modify/:id', async (req, res) => {
 app.delete('/delete/:id', async (req, res) => {
     // :param -> req.params.param
     let result = await db.collection('write').deleteOne({ _id: new ObjectId(req.params.id) }) 
-    console.log(result)
     res.redirect('/list')
 })
