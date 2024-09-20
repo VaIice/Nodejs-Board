@@ -36,9 +36,13 @@ app.set('view engine', 'ejs');
 app.use(express.json())
 app.use(express.urlencoded({ extended: true })) 
 
+// form에서의 PUT, DELETE method
+const methodOverride = require('method-override')
+app.use(methodOverride('_method')) 
+
 //////////////////////// 서버 ////////////////////////
 app.get('/', (req, res) => {
-    res.send('안녕')
+    res.redirect('/list')
 })
 
 app.get('/news', (req, res) => {
@@ -83,10 +87,62 @@ app.post('/write/add', async (req, res) => {
 })
 
 app.get('/detail/:id', async (req, res) => {
-    let result = await db.collection('write').findOne({ _id: new ObjectId('') }) 
+    // :param -> req.params.param
+    let result = await db.collection('write').findOne({ _id: new ObjectId(req.params.id) }) 
     const data = {
+        id: result._id,
         title: result.title,
         content: result.content
     }
     res.render('detail.ejs', data);
+})
+
+app.delete('/delete/:id', async (req, res) => {
+    try {
+        await db.collection('write').deleteOne({ _id: new ObjectId(req.params.id) });
+        res.redirect('/list');
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('서버 오류');
+    }
+});
+
+app.get('/modify/:id', async (req, res) => {
+    // :param -> req.params.param
+    let result = await db.collection('write').findOne({ _id: new ObjectId(req.params.id) }) 
+    const data = {
+        id: result._id,
+        title: result.title,
+        content: result.content
+    }
+    res.render('modify.ejs', data);
+})
+
+app.put('/modify/:id', async (req, res) => {
+    // :param -> req.params.param
+    const body = req.body;
+    let data = {
+        // $inc 증감 연산자
+        // $mul 곱셈
+        // $unset 삭제
+        $set: {
+            title: body.title,
+            content: body.content
+        }
+    }
+    // $gt 초과
+    // $gte 이상
+    // $lt 미만
+    // $lte 이하
+    // $ne !==
+    // let result = await db.collection('write').updateMany({ like: {$gt: 5}, data) 
+    let result = await db.collection('write').updateOne({ _id: new ObjectId(req.params.id) }, data) 
+    res.redirect('/list')
+})
+
+app.delete('/delete/:id', async (req, res) => {
+    // :param -> req.params.param
+    let result = await db.collection('write').deleteOne({ _id: new ObjectId(req.params.id) }) 
+    console.log(result)
+    res.redirect('/list')
 })

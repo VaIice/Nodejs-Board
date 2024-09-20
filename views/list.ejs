@@ -11,7 +11,9 @@
     <div class="white-bg">
         <% for(let i=0;i<list.length;i++) { %>
             <div class="list-box">
-                <h4><%=list[i].title%></h4>
+                <a href="/detail/<%=list[i]._id%>">
+                    <h4><%=list[i].title%></h4>
+                </a>
             </div>
         <% } %>
         <button id="writeBtn">글쓰기</button>
