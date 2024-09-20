@@ -12,9 +12,16 @@
         <% for(let i=0;i<list.length;i++) { %>
             <div class="list-box">
                 <h4><%=list[i].title%></h4>
-                <p>글내용임</p>
             </div>
         <% } %>
+        <button id="writeBtn">글쓰기</button>
     </div> 
-  </body>
+
+    <script>
+        document.getElementById('writeBtn').addEventListener('click', function() {
+            window.location.href = '/write';
+        });
+    </script>
+
+</body>
 </html>

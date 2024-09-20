@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link href="/main.css" rel="stylesheet">
+</head>
+<body>
+  <!-- action='<url>' -->
+    <%- include('navbar.ejs') %>
+    <form class="form-box" action="/write/add" method="POST">
+    <h4>글쓰기</h4>
+    <!-- 서버로 보내려면 name='' 작명 -->
+      <input name="title">
+      <input name="content">
+      <button type="submit">전송</button>
+  </form> 
+</body>
+</html>
