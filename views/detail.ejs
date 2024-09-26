@@ -21,12 +21,14 @@
         window.location.href = '/modify/<%=id%>';
     });
 
-    document.getElementById('deleteBtn').addEventListener('click', function() {
-      fetch('/delete/<%=id%>', {
+    document.getElementById('deleteBtn').addEventListener('click', async () => {
+      const response = await fetch('/delete?id=<%=id%>', {
         method : 'DELETE',
         headers : { 'Content-Type' : 'application/json' },
       })
-      window.location.href = '/';
+      if (response.ok) {
+        window.location.href = '/list'
+      }
     });
   </script>
 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     <link href="/main.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script> 
 </head>
 <body class="grey-bg">
     <%- include('navbar.ejs') %>
@@ -14,15 +15,43 @@
                 <a href="/detail/<%=list[i]._id%>">
                     <h4><%=list[i].title%></h4>
                 </a>
+                <button class="deleteBtn" data-id="<%=list[i]._id%>">삭제하기</button>
             </div>
         <% } %>
+        <% for(let i=1; i<=totalPage; i++) { %>
+            <button class="pagination" data-i="<%=i%>"><%=i%></button>
+        <% } %>
         <button id="writeBtn">글쓰기</button>
+        <a href="/list/next/<%=list[list.length - 1]._id%>">다음</a>
+        <a href="/sign-up">회원가입</a>
+        <a href="/sign-in">로그인</a>
+        <a href="/sign-out">로그아웃</a>
     </div> 
 
     <script>
         document.getElementById('writeBtn').addEventListener('click', function() {
             window.location.href = '/write';
         });
+     
+        document.querySelectorAll('.deleteBtn').forEach(button => {
+            button.addEventListener('click', async function(e) {
+                const id = e.target.dataset.id;
+                // /delete/id=id -> params
+                const response = await axios.delete('/delete', {
+                    params: {id: id},
+                    headers: { 'Content-Type': 'application/json' },
+                });         
+                if (response.status === 204) {
+                    e.target.parentElement.parentElement.style.display = 'none';
+                }                
+            })
+        })
+
+        document.querySelectorAll('.pagination').forEach(button => {
+            button.addEventListener('click', async function(e) {
+                window.location.href = '/list/' + e.target.dataset.i;          
+            })
+        })        
     </script>
 </body>
 </html>
