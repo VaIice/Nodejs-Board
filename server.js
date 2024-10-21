@@ -43,24 +43,25 @@ app.use(methodOverride('_method'))
 const session = require('express-session')
 const passport = require('passport')
 const LocalStrategy = require('passport-local')
+// 세션 DB 저장
 const MongoStore = require('connect-mongo')
     
-// passport 회원인증
-// passport-local 아이디/비밀번호 방식 회원인증
-// express-session 세션 라이브러리
-app.use(passport.initialize())
+// express-session 세션 라이브러리 설정
 app.use(session({
     secret: process.env.SESSION_SECRET,
-    resave : false,
+    resave: false,
     saveUninitialized: false,
-    // 유효기간
     cookie: { maxAge: 60 * 60 * 1000 },
     store: MongoStore.create({
         mongoUrl: process.env.DB_URL,
         dbName: 'community'
     })
-}))
+}));
 
+// passport 회원인증 초기화
+app.use(passport.initialize());
+
+// 로그인 세션을 유지하기 위해 필요
 app.use(passport.session()) 
 
 // 입력한 정보가 DB와 일치하는지 검증
@@ -98,8 +99,43 @@ passport.deserializeUser(async (user, done) => {
 
 const bcrypt = require('bcrypt')
 
+// multer
+const { S3Client } = require('@aws-sdk/client-s3')
+const multer = require('multer')
+const multerS3 = require('multer-s3')
+const s3 = new S3Client({
+  region : 'ap-northeast-2',
+  credentials : {
+      accessKeyId : process.env.S3_ACCESS_KEY,
+      secretAccessKey : process.env.S3_SECRET_ACCESS_KEY
+  }
+})
+
+// upload.single('input명')
+// upload.array('input명', 최대 개수 - 1)
+const upload = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: process.env.S3_BUCKET_NAME,
+    key: function (req, file, cb) {
+      cb(null, Date.now().toString())
+    }
+  })
+})
+
 //////////////////////// 서버 ////////////////////////
-app.get('/', (req, res) => {
+
+function checkLogin(req, res, next) {
+    if (!req.user) {
+        return res.send('로그인하세요');
+    }
+    // middleware 끝 -> 다음으로 이동
+    next();
+}
+
+// middleware, 여러 개 사용하고 싶으면 [middleware1, middleware2, ...]
+// 다수의 API에 적용하고 싶으면 app.use('URL 옵션', checkLogin) -> 밑에 있는 API checkLogin 적용
+app.get('/', checkLogin, (req, res) => {
     res.redirect('/list/1')
 })
 
@@ -137,38 +173,42 @@ app.get('/write', (req, res) => {
     res.send('로그인 하세요')
 })
 
+// req.file / files로 출력 가능
 app.post('/write/add', async (req, res) => {
-    try {
-        const body = req.body;
-        const data = {
-            title: body.title,
-            content: body.content
-        }
-        if (!data.title || !data.content) {
-            res.send('내용을 입력해주세요.');
-        }
-        // collection에 document 기록
-        else if (res.statusCode === 200) {
-            let result = await db.collection('write').insertOne(data)
-            res.redirect('/list')
-        }
-        else {
+    upload.single('img')(req, res, async (err) => {
+        if (err) return res.send('에러');
+        try {
+            const body = req.body;
+            const data = {
+                title: body.title,
+                content: body.content
+            }
+            if (!data.title || !data.content) {
+                return res.send('내용을 입력해주세요.');
+            }
+            // collection에 document 기록
+            await db.collection('write').insertOne({
+                title: data.title,
+                content: data.content,
+                img: req.file.location
+            })
             res.redirect('/')
         }
-    }
-    catch {
-        res.redirect('/')
-    }
+        catch (error){
+            console.error(error); // 에러 로그 기록
+            res.send('글 작성 중 오류가 발생했습니다. 다시 시도해주세요.');
+        } 
+    })
 })
 
 app.get('/detail/:id', async (req, res) => {
     // :param -> req.params.param
     let result = await db.collection('write').findOne({ _id: new ObjectId(req.params.id) }) 
-
     const data = {
         id: result._id,
         title: result.title,
-        content: result.content
+        content: result.content,
+        img: result.img
     }
     res.render('detail.ejs', data);
 })
@@ -223,8 +263,8 @@ app.put('/modify/:id', async (req, res) => {
     // $lte 이하
     // $ne !==
     // let result = await db.collection('write').updateMany({ like: {$gt: 5}, data) 
-    let result = await db.collection('write').updateOne({ _id: new ObjectId(req.params.id) }, data) 
-    res.redirect('/list')
+    await db.collection('write').updateOne({ _id: new ObjectId(req.params.id) }, data) 
+    res.redirect('/')
 })
 
 app.get('/sign-up', async (req, res) => {
@@ -234,6 +274,7 @@ app.get('/sign-up', async (req, res) => {
 app.post('/sign-up/add', async (req, res) => {
     const body = req.body;
     if (body.id && body.password) {
+        // bcrypt 사용시 salt (자동 랜덤 문자) 생성
         let hashingPassword = await bcrypt.hash(body.password, 10);
         const data = {
             id: body.id,
@@ -260,13 +301,18 @@ app.get('/sign-in', async (req, res) => {
     res.render('signIn.ejs');
 })
 
-app.post('/sign-in', async (req, res, next) => {
+function checkEmpty(req, res, next) {
+    if (!req.body.username) {
+        return res.send('아이디를 입력해주세요.');
+    } else if (!req.body.password) {
+        return res.send('비밀번호를 입력해주세요.');
+    }
+    next();
+}
+
+app.post('/sign-in', checkEmpty, async (req, res, next) => {
     // local strategy / 로그인 요청 처리
     // 기본적으로 username과 password 필드를 찾고 req.body이 전달
-    if (req.body.password !== req.body.passwordCheck) {
-        res.send('비밀번호가 다르잖아요')
-        return;
-    }
     passport.authenticate('local', (error, user, info) => {
         if (error) return res.status(500).json(error)
         if (!user) return res.status(401).json(info.message)
@@ -287,7 +333,7 @@ app.get('/me', async (req, res) => {
     }
 })
 
-app.get('/sign-out', (req, res) => {
+app.get('/sign-out', async (req, res) => {
     if (req.user) {
         req.session.destroy((err) => {
             if (err) return next(err)
